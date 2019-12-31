@@ -1,0 +1,27 @@
+sudo: required
+services:
+  - docker
+env:
+  global:
+    - SHA=$(git rev-parse HEAD)
+    - CLOUDSDK_CORE_DISABLE_PROMPTS=1
+before_install:
+  - openssl aes-256-cbc -K $encrypted_0c35eebf403c_key -iv $encrypted_0c35eebf403c_iv -in multi-k8s.json.enc -out multi-k8s.json -d
+  - curl https://sdk.cloud.google.com | bash > /dev/null; # set up google cloud cli in travis invierment
+  - source $HOME/google-cloud-sdk/path.bash.inc          # configer google cloud cli in travis invierment
+  - gcloud components update kubectl                     # install kubectl in travis invierment
+  - gcloud auth activate-service-account --key-file multi-k8s.json  # google cloud accout info
+  - gcloud config set project multi-k8s-263714
+  - gcloud config set compute/zone us-central1-a
+  - gcloud container clusters get-credentials multi-k8s-cluster
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin  # docker cli login
+  - docker build -t laflash/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true laflash/react-test npm run test -- --coverage
+
+deploy:
+  provider: script
+  script: bash ./deploy.sh
+  on:
+    branch: master
